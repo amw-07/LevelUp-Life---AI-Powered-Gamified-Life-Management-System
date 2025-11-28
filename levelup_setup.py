@@ -58,18 +58,44 @@ from enum import Enum
 from dataclasses import dataclass, field
 import random
 
-# CrewAI imports
-from crewai import Agent, Task, Crew, Process
-from crewai.tools import tool
+# CrewAI imports (optional)
+try:
+    from crewai import Agent, Task, Crew, Process
+    from crewai.tools import tool
+    _CREWAI_AVAILABLE = True
+except Exception:
+    Agent = Task = Crew = Process = None
+    def tool(func=None, **kwargs):
+        def decorator(f):
+            return f
+        return decorator
+    _CREWAI_AVAILABLE = False
 
-# LangChain imports
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.memory import ConversationBufferMemory
+# LangChain imports (optional)
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain.memory import ConversationBufferMemory
+    _LANGCHAIN_AVAILABLE = True
+except Exception:
+    ChatGoogleGenerativeAI = None
+    ConversationBufferMemory = None
+    _LANGCHAIN_AVAILABLE = False
 
-# Pydantic for data validation
-from pydantic import BaseModel, Field
+# Pydantic for data validation (optional)
+try:
+    from pydantic import BaseModel, Field
+    _PYDANTIC_AVAILABLE = True
+except Exception:
+    class BaseModel:  # minimal placeholder
+        pass
+    def Field(*a, **k):
+        return None
+    _PYDANTIC_AVAILABLE = False
 
-print("✅ All imports successful!")
+print("✅ Imports attempted — optional libs available:",
+      f"crewai={_CREWAI_AVAILABLE}",
+      f"langchain={_LANGCHAIN_AVAILABLE}",
+      f"pydantic={_PYDANTIC_AVAILABLE}")
 
 # ============================================================================
 # SECTION 3: CONFIGURATION & CONSTANTS
