@@ -1,14 +1,15 @@
 import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Zap, Trophy, Flame, Target, TrendingUp, Star, LogOut } from "lucide-react";
+import { Zap, Trophy, Flame, Target, TrendingUp, Star } from "lucide-react";
 import { getMe } from "../api/users";
 import { getTodayQuests, completeQuest, generateQuests } from "../api/quests";
-import { useAuthStore } from "../store/authStore";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { QuestList } from "../components/quests/QuestList";
 import { XpRollUp } from "../components/animations/XpRollUp";
 import { LevelUpOverlay } from "../components/animations/LevelUpOverlay";
 import { AchievementToastContainer } from "../components/animations/AchievementToast";
+import { ErrorBoundary } from "../components/ErrorBoundary";
+import EmptyState from "../components/EmptyState";
 import {
   getRankProgress,
   RANK_COLORS,
@@ -21,7 +22,6 @@ import type { Achievement, CompletionResult, Rank, WsEvent } from "../types";
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
-  const clearTokens = useAuthStore((s) => s.clearTokens);
 
   const [xpAnimation, setXpAnimation] = useState<number | null>(null);
   const [levelUpData, setLevelUpData] = useState<{ level: number; rank: Rank; rankedUp: boolean } | null>(null);
@@ -119,10 +119,6 @@ export default function DashboardPage() {
     [completeMutation]
   );
 
-  const handleLogout = useCallback(() => {
-    clearTokens();
-  }, [clearTokens]);
-
   if (userLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
@@ -161,202 +157,215 @@ export default function DashboardPage() {
         onDismiss={handleDismissAchievement}
       />
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Section 1: Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-black text-white">⚔️ LevelUp Life</h1>
-            <p className="text-purple-300 text-sm mt-1">Welcome back, {user.username}</p>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
-          >
-            <LogOut size={16} />
-            Logout
-          </button>
-        </div>
-
+      <div className="max-w-7xl mx-auto px-6 py-6">
         {/* Section 2: Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Level</span>
-              <Zap className="text-yellow-400" size={18} />
+        <ErrorBoundary>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Level</span>
+                <Zap className="text-yellow-400" size={18} />
+              </div>
+              <div className="text-4xl font-black text-white">{user.level}</div>
+              <div className="text-xs text-purple-300 mt-1">{user.total_xp.toLocaleString()} XP</div>
+              <div className="mt-2 w-full bg-slate-700 rounded-full h-1.5">
+                <div
+                  className="bg-yellow-400 h-1.5 rounded-full transition-all duration-700"
+                  style={{ width: `${levelPct}%` }}
+                />
+              </div>
             </div>
-            <div className="text-4xl font-black text-white">{user.level}</div>
-            <div className="text-xs text-purple-300 mt-1">{user.total_xp.toLocaleString()} XP</div>
-            <div className="mt-2 w-full bg-slate-700 rounded-full h-1.5">
-              <div
-                className="bg-yellow-400 h-1.5 rounded-full transition-all duration-700"
-                style={{ width: `${levelPct}%` }}
-              />
-            </div>
-          </div>
 
-          <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Rank</span>
-              <Trophy className="text-yellow-400" size={18} />
+            <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Rank</span>
+                <Trophy className="text-yellow-400" size={18} />
+              </div>
+              <div className={`text-4xl font-black ${RANK_COLORS[user.rank]}`}>{user.rank}</div>
+              <div className="text-xs text-purple-300 mt-1">
+                {rankProgress.nextRank
+                  ? `${rankProgress.xpNeeded.toLocaleString()} XP to ${rankProgress.nextRank}`
+                  : "MAX RANK"}
+              </div>
             </div>
-            <div className={`text-4xl font-black ${RANK_COLORS[user.rank]}`}>{user.rank}</div>
-            <div className="text-xs text-purple-300 mt-1">
-              {rankProgress.nextRank
-                ? `${rankProgress.xpNeeded.toLocaleString()} XP to ${rankProgress.nextRank}`
-                : "MAX RANK"}
-            </div>
-          </div>
 
-          <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Streak</span>
-              <Flame className="text-orange-400" size={18} />
+            <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Streak</span>
+                <Flame className="text-orange-400" size={18} />
+              </div>
+              <div className="text-4xl font-black text-white">{user.current_streak}</div>
+              <div className="text-xs text-purple-300 mt-1">🏆 Best: {user.longest_streak}</div>
             </div>
-            <div className="text-4xl font-black text-white">{user.current_streak}</div>
-            <div className="text-xs text-purple-300 mt-1">🏆 Best: {user.longest_streak}</div>
-          </div>
 
-          <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Today</span>
-              <Target className="text-green-400" size={18} />
+            <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Today</span>
+                <Target className="text-green-400" size={18} />
+              </div>
+              <div className="text-4xl font-black text-white">
+                {todayCompleted}/{quests.length}
+              </div>
+              <div className="text-xs text-purple-300 mt-1">Quests Done</div>
             </div>
-            <div className="text-4xl font-black text-white">
-              {todayCompleted}/{quests.length}
-            </div>
-            <div className="text-xs text-purple-300 mt-1">Quests Done</div>
           </div>
-        </div>
+        </ErrorBoundary>
 
         {/* Section 3: Rank Progress Bar */}
-        <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50 mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-white font-semibold">Rank Progress</span>
-            <span className="text-purple-300 text-sm">{Math.round(rankProgress.percent)}%</span>
+        <ErrorBoundary>
+          <div className="bg-slate-800 rounded-xl p-5 border border-purple-500/50 mb-6">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-white font-semibold">Rank Progress</span>
+              <span className="text-purple-300 text-sm">{Math.round(rankProgress.percent)}%</span>
+            </div>
+            <div className="w-full bg-slate-700 rounded-full h-3">
+              <div
+                className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-700"
+                style={{ width: `${rankProgress.percent}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-2 text-sm">
+              <span className={`font-bold ${RANK_COLORS[user.rank]}`}>{user.rank}</span>
+              {rankProgress.nextRank && (
+                <span className={`font-bold ${RANK_COLORS[rankProgress.nextRank]}`}>
+                  {rankProgress.nextRank}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="w-full bg-slate-700 rounded-full h-3">
-            <div
-              className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-700"
-              style={{ width: `${rankProgress.percent}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-2 text-sm">
-            <span className={`font-bold ${RANK_COLORS[user.rank]}`}>{user.rank}</span>
-            {rankProgress.nextRank && (
-              <span className={`font-bold ${RANK_COLORS[rankProgress.nextRank]}`}>
-                {rankProgress.nextRank}
-              </span>
-            )}
-          </div>
-        </div>
+        </ErrorBoundary>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Section 4: Quest List (main area) */}
           <div className="lg:col-span-2 space-y-6">
             {/* Motivational quote */}
-            <div className="bg-gradient-to-r from-purple-700 to-pink-700 rounded-xl p-5">
-              <div className="flex items-start gap-3">
-                <Star className="text-yellow-300 flex-shrink-0 mt-0.5" size={22} />
-                <div>
-                  <p className="text-white italic leading-relaxed">
-                    "The body achieves what the mind believes."
-                  </p>
-                  <p className="text-purple-200 text-xs mt-2">— Your AI Coach</p>
+            <ErrorBoundary>
+              <div className="bg-gradient-to-r from-purple-700 to-pink-700 rounded-xl p-5">
+                <div className="flex items-start gap-3">
+                  <Star className="text-yellow-300 flex-shrink-0 mt-0.5" size={22} />
+                  <div>
+                    <p className="text-white italic leading-relaxed">
+                      "The body achieves what the mind believes."
+                    </p>
+                    <p className="text-purple-200 text-xs mt-2">— Your AI Coach</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ErrorBoundary>
 
             {/* Daily Quests */}
-            <div className="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
-              <h2 className="text-xl font-bold text-white mb-5 flex items-center gap-2">
-                <Target size={20} className="text-purple-400" />
-                Daily Quests
-              </h2>
-              <QuestList
-                quests={quests}
-                generating={questsData?.generating ?? false}
-                isLoading={questsLoading}
-                completingId={completingId}
-                onComplete={handleCompleteQuest}
-                onGenerate={() => generateMutation.mutate()}
-                isGenerating={generateMutation.isPending}
-              />
-            </div>
+            <ErrorBoundary>
+              <div className="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                <h2 className="text-xl font-bold text-white mb-5 flex items-center gap-2">
+                  <Target size={20} className="text-purple-400" />
+                  Daily Quests
+                </h2>
+                {quests.length === 0 && !questsLoading ? (
+                  <EmptyState
+                    type="quests"
+                    action={{
+                      label: "Generate Quests",
+                      onClick: () => generateMutation.mutate(),
+                    }}
+                  />
+                ) : (
+                  <QuestList
+                    quests={quests}
+                    generating={questsData?.generating ?? false}
+                    isLoading={questsLoading}
+                    completingId={completingId}
+                    onComplete={handleCompleteQuest}
+                    onGenerate={() => generateMutation.mutate()}
+                    isGenerating={generateMutation.isPending}
+                  />
+                )}
+              </div>
+            </ErrorBoundary>
           </div>
 
           {/* Section 5: Stats Sidebar */}
           <div className="space-y-6">
             {/* Character Stats */}
-            <div className="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
-              <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2">
-                <TrendingUp size={18} className="text-purple-400" />
-                Character Stats
-              </h3>
-              <div className="space-y-3">
-                {ALL_STATS.map((stat) => {
-                  const value = user.stats[stat] ?? 0;
-                  return (
-                    <div key={stat}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className={`capitalize ${STAT_TEXT_COLORS[stat]}`}>{stat}</span>
-                        <span className="text-white font-semibold">{value}</span>
+            <ErrorBoundary>
+              <div className="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2">
+                  <TrendingUp size={18} className="text-purple-400" />
+                  Character Stats
+                </h3>
+                <div className="space-y-3">
+                  {ALL_STATS.map((stat) => {
+                    const value = user.stats[stat] ?? 0;
+                    return (
+                      <div key={stat}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className={`capitalize ${STAT_TEXT_COLORS[stat]}`}>{stat}</span>
+                          <span className="text-white font-semibold">{value}</span>
+                        </div>
+                        <div className="w-full bg-slate-700 rounded-full h-2">
+                          <div
+                            className={`${STAT_COLORS[stat]} h-2 rounded-full transition-all duration-700`}
+                            style={{ width: `${Math.min(100, value)}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-slate-700 rounded-full h-2">
-                        <div
-                          className={`${STAT_COLORS[stat]} h-2 rounded-full transition-all duration-700`}
-                          style={{ width: `${Math.min(100, value)}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            </ErrorBoundary>
 
             {/* Quest Domain Breakdown */}
-            <div className="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
-              <h3 className="text-lg font-bold text-white mb-4">Domain Progress</h3>
-              <div className="space-y-2">
-                {(["fitness", "productivity", "learning"] as const).map((domain) => (
-                  <div key={domain} className="flex justify-between items-center text-sm">
-                    <span className="text-gray-400 capitalize">{domain}</span>
-                    <span className="text-white font-semibold">
-                      {user.quests_by_domain[domain] ?? 0} quests
-                    </span>
-                  </div>
-                ))}
-                <div className="pt-2 border-t border-slate-700 flex justify-between text-sm">
-                  <span className="text-gray-400">Total Completed</span>
-                  <span className="text-yellow-400 font-bold">{user.total_quests_completed}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Achievements */}
-            {user.achievements.length > 0 && (
+            <ErrorBoundary>
               <div className="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
-                <h3 className="text-lg font-bold text-white mb-4">Achievements</h3>
-                <div className="flex flex-wrap gap-3">
-                  {user.achievements.slice(0, 8).map((ach) => (
-                    <div
-                      key={ach.id}
-                      title={ach.name}
-                      className="w-10 h-10 flex items-center justify-center bg-slate-700 rounded-lg text-xl"
-                    >
-                      {ach.icon}
+                <h3 className="text-lg font-bold text-white mb-4">Domain Progress</h3>
+                <div className="space-y-2">
+                  {(["fitness", "productivity", "learning"] as const).map((domain) => (
+                    <div key={domain} className="flex justify-between items-center text-sm">
+                      <span className="text-gray-400 capitalize">{domain}</span>
+                      <span className="text-white font-semibold">
+                        {user.quests_by_domain[domain] ?? 0} quests
+                      </span>
                     </div>
                   ))}
+                  <div className="pt-2 border-t border-slate-700 flex justify-between text-sm">
+                    <span className="text-gray-400">Total Completed</span>
+                    <span className="text-yellow-400 font-bold">{user.total_quests_completed}</span>
+                  </div>
                 </div>
               </div>
-            )}
+            </ErrorBoundary>
+
+            {/* Achievements */}
+            <ErrorBoundary>
+              {user.achievements.length > 0 ? (
+                <div className="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                  <h3 className="text-lg font-bold text-white mb-4">Achievements</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {user.achievements.slice(0, 8).map((ach) => (
+                      <div
+                        key={ach.id}
+                        title={ach.name}
+                        className="w-10 h-10 flex items-center justify-center bg-slate-700 rounded-lg text-xl"
+                      >
+                        {ach.icon}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <EmptyState type="history" />
+              )}
+            </ErrorBoundary>
 
             {/* AI Status */}
-            <div className="bg-gradient-to-br from-purple-700 to-pink-700 rounded-xl p-5">
-              <h3 className="text-base font-bold text-white mb-2">🤖 AI Agents Active</h3>
-              <p className="text-purple-200 text-sm">
-                5 specialized agents optimizing your quest experience in real-time.
-              </p>
-            </div>
+            <ErrorBoundary>
+              <div className="bg-gradient-to-br from-purple-700 to-pink-700 rounded-xl p-5">
+                <h3 className="text-base font-bold text-white mb-2">🤖 AI Agents Active</h3>
+                <p className="text-purple-200 text-sm">
+                  5 specialized agents optimizing your quest experience in real-time.
+                </p>
+              </div>
+            </ErrorBoundary>
           </div>
         </div>
       </div>

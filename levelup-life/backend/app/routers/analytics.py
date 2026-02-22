@@ -3,7 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.user import User
 from app.services.user_service import get_current_user
-from app.services.analytics_service import get_summary, get_streak_data
+from app.services.analytics_service import (
+    get_summary,
+    get_streak_data,
+    get_weekly_report,
+    get_patterns,
+)
 
 router = APIRouter()
 
@@ -22,7 +27,7 @@ async def weekly_report(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return {"week": week, "insights": "Weekly AI report coming soon.", "metrics": {}}
+    return await get_weekly_report(user.id, week, db)
 
 
 @router.get("/streaks")
@@ -38,9 +43,4 @@ async def patterns(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return {
-        "best_day": None,
-        "best_time": None,
-        "top_domain": None,
-        "completion_rate_trend": None,
-    }
+    return await get_patterns(user.id, db)
