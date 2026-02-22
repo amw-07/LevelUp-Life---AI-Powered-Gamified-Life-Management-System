@@ -29,3 +29,8 @@ async def get_db():
         except Exception:
             await session.rollback()
             raise
+
+
+def get_async_session():
+    """Get an async session for use in Celery tasks."""
+    return AsyncSessionLocal()
