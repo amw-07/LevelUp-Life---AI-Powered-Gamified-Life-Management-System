@@ -88,7 +88,7 @@ async def complete_quest(
     user.quests_by_domain = new_quests_by_domain
     user.last_active = datetime.now(timezone.utc)
 
-    await db.commit()
+    await db.flush()
 
     from app.schemas.achievement import AchievementOut
     achievements_out = [AchievementOut.model_validate(a) for a in new_achievements]

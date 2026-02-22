@@ -148,5 +148,17 @@ async def refresh(
 
 
 @router.post("/logout")
-async def logout(user: User = Depends(get_current_user)):
+async def logout(
+    body: RefreshRequest | None = None,
+    user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    if body and body.refresh_token:
+        try:
+            payload = decode_token(body.refresh_token)
+            jti = payload.get("jti")
+            if jti:
+                await redis.delete(f"refresh:{jti}")
+        except Exception:
+            pass
     return {"success": True}

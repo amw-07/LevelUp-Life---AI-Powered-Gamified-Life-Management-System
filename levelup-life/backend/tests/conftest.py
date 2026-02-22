@@ -1,14 +1,20 @@
+import os
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from unittest.mock import AsyncMock
+
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-32-bytes-minimum!")
+os.environ.setdefault("GEMINI_API_KEY", "test-placeholder")
+
 from app.main import app
 from app.database import Base, get_db
 from app.redis_client import get_redis
-from unittest.mock import AsyncMock
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
-
 
 test_engine = create_async_engine(
     TEST_DATABASE_URL,

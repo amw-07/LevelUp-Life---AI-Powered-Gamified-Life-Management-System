@@ -1,18 +1,9 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import String, Integer, Boolean, Text, TIMESTAMP, JSON
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import event
 from app.database import Base
-
-
-def _jsonb_or_json():
-    try:
-        from sqlalchemy.dialects.postgresql import JSONB as _JSONB
-        return _JSONB
-    except Exception:
-        return JSON
 
 
 class User(Base):

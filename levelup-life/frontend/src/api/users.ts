@@ -6,6 +6,18 @@ export async function getMe(): Promise<User> {
   return res.data;
 }
 
+export async function updateMe(data: Partial<{
+  username: string;
+  work_style: string;
+  activity_level: string;
+  goals: Record<string, string[]>;
+  mindset_profile: string[];
+  preferred_times: Record<string, string>;
+}>): Promise<User> {
+  const res = await api.patch<User>("/users/me", data);
+  return res.data;
+}
+
 export async function getAchievements(): Promise<Achievement[]> {
   const res = await api.get<Achievement[]>("/users/me/achievements");
   return res.data;

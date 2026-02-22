@@ -36,12 +36,29 @@ export default function AnalyticsPage() {
 
   const weeklyChartData = useMemo(() => {
     if (!weeklyReport?.metrics) return [];
+    const domains = ["fitness", "productivity", "learning"] as const;
+    const totals = { completed: 0, xp: 0 };
+    for (const d of domains) {
+      const m = weeklyReport.metrics[d];
+      if (m) {
+        totals.completed += m.completed;
+        totals.xp += m.xp;
+      }
+    }
+    const weekStart = weeklyReport.week_start
+      ? new Date(weeklyReport.week_start)
+      : new Date();
     const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    return dayNames.map((day) => ({
-      day,
-      completed: 0,
-      xp: 0,
-    }));
+    return dayNames.map((day, i) => {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      const isToday = d.toDateString() === new Date().toDateString();
+      return {
+        day,
+        completed: isToday ? totals.completed : 0,
+        xp: isToday ? totals.xp : 0,
+      };
+    });
   }, [weeklyReport]);
 
   const domainChartData = useMemo(() => {

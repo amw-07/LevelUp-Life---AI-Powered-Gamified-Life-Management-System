@@ -52,4 +52,20 @@ async def _generate_quests_async(user_id: str) -> dict:
 
 @celery_app.task(name="tasks.quest_tasks.pre_generate_quests")
 def pre_generate_quests():
-    pass
+    import asyncio
+
+    async def _run():
+        from sqlalchemy import select
+        from app.database import get_async_session
+        from app.models.user import User
+
+        async with get_async_session() as db:
+            result = await db.execute(select(User).where(User.onboarding_completed == True))
+            users = result.scalars().all()
+            for user in users:
+                celery_app.send_task("tasks.generate_quests", args=[str(user.id)])
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(_run())
+    loop.close()
