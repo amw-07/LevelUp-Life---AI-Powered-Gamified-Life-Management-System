@@ -38,6 +38,16 @@ async def test_register_duplicate_email(client: AsyncClient):
     assert resp.status_code == 409
 
 
+async def test_register_duplicate_username(client: AsyncClient):
+    await register_user(client)
+    resp = await register_user(client, {
+        "email": "different@example.com",
+        "username": VALID_USER["username"],
+        "password": "StrongPass123",
+    })
+    assert resp.status_code == 409
+
+
 async def test_login_success(client: AsyncClient):
     await register_user(client)
     resp = await client.post(
@@ -60,6 +70,14 @@ async def test_login_bad_password(client: AsyncClient):
     assert resp.status_code == 401
 
 
+async def test_login_nonexistent_user(client: AsyncClient):
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "nobody@example.com", "password": "AnyPass123"},
+    )
+    assert resp.status_code == 401
+
+
 async def test_refresh_token(client: AsyncClient):
     reg = await register_user(client)
     refresh_token = reg.json()["refresh_token"]
@@ -70,6 +88,14 @@ async def test_refresh_token(client: AsyncClient):
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
+
+
+async def test_refresh_invalid_token(client: AsyncClient):
+    resp = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": "totally.invalid.token"},
+    )
+    assert resp.status_code == 401
 
 
 async def test_protected_no_token(client: AsyncClient):
@@ -90,3 +116,23 @@ async def test_protected_expired_token(client: AsyncClient):
         headers={"Authorization": f"Bearer {expired_token}"},
     )
     assert resp.status_code == 401
+
+
+async def test_logout(client: AsyncClient):
+    reg = await register_user(client)
+    token = reg.json()["access_token"]
+    resp = await client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+
+async def test_access_token_is_jwt(client: AsyncClient):
+    reg = await register_user(client)
+    token = reg.json()["access_token"]
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    assert payload.get("type") == "access"
+    assert "sub" in payload
+    assert "exp" in payload

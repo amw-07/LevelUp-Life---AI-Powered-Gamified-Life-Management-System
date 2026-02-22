@@ -14,9 +14,16 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
     ENVIRONMENT: str = "development"
+    COOKIE_SECURE: bool = False
+    COOKIE_HTTPONLY: bool = True
+    COOKIE_SAMESITE: str = "strict"
 
     class Config:
         env_file = ".env"
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT == "production"
 
 
 settings = Settings()

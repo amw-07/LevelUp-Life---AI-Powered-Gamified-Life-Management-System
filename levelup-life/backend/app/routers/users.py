@@ -7,6 +7,7 @@ from app.schemas.user import UserOut, UserUpdate, OnboardingRequest, UserStatsOu
 from app.schemas.achievement import AchievementOut
 from app.services.user_service import get_current_user
 from app.redis_client import get_redis
+import redis.asyncio as aioredis
 
 router = APIRouter()
 
@@ -17,13 +18,12 @@ USER_CACHE_TTL = 300
 async def get_me(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
-    redis = get_redis()
     cache_key = f"user:{user.id}:me"
     cached = await redis.get(cache_key)
     if cached:
-        import json as _json
-        data = _json.loads(cached)
+        data = json.loads(cached)
         return data
 
     out = UserOut.model_validate(user)
@@ -36,6 +36,7 @@ async def update_me(
     body: UserUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     update_data = body.model_dump(exclude_none=True)
     for field, value in update_data.items():
@@ -44,7 +45,6 @@ async def update_me(
     await db.flush()
     await db.refresh(user)
 
-    redis = get_redis()
     await redis.delete(f"user:{user.id}:me")
 
     return UserOut.model_validate(user)
@@ -55,6 +55,7 @@ async def complete_onboarding(
     body: OnboardingRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     user.goals = body.goals
     user.mindset_profile = body.mindset_profile
@@ -66,7 +67,6 @@ async def complete_onboarding(
     await db.flush()
     await db.refresh(user)
 
-    redis = get_redis()
     await redis.delete(f"user:{user.id}:me")
 
     return UserOut.model_validate(user)

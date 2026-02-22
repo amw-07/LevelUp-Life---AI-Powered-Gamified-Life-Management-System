@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
@@ -20,9 +22,11 @@ from app.services.auth_service import (
 )
 from app.services.user_service import get_user_by_email, get_current_user
 from app.redis_client import get_redis
+from app.config import settings
 from jose import JWTError
 import redis.asyncio as aioredis
 
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter()
 
 
@@ -65,15 +69,19 @@ async def register(
     jti = payload.get("jti")
     await redis.setex(f"refresh:{jti}", 60 * 60 * 24 * 30, str(user.id))
 
-    return {
+    response_data = {
         "user": UserOut.model_validate(user),
         "access_token": access_token,
         "refresh_token": refresh_token,
     }
 
+    return response_data
+
 
 @router.post("/login")
+@limiter.limit("5/15minutes")
 async def login(
+    request: Request,
     body: LoginRequest,
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
@@ -89,11 +97,32 @@ async def login(
     jti = payload.get("jti")
     await redis.setex(f"refresh:{jti}", 60 * 60 * 24 * 30, str(user.id))
 
-    return {
+    response = {
         "user": UserOut.model_validate(user),
         "access_token": access_token,
         "refresh_token": refresh_token,
     }
+
+    if settings.ENVIRONMENT == "production":
+        from fastapi.responses import JSONResponse
+        import json
+        from app.schemas.user import UserOut as _UserOut
+        resp = JSONResponse(content={
+            "user": json.loads(UserOut.model_validate(user).model_dump_json()),
+            "access_token": access_token,
+        })
+        resp.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            max_age=60 * 60 * 24 * 30,
+            path="/",
+        )
+        return resp
+
+    return response
 
 
 @router.post("/refresh")
