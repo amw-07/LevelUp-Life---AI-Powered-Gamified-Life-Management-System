@@ -11,6 +11,7 @@ from app.schemas.quest import QuestCreate, QuestOut, CompletionResult
 from app.services.user_service import get_current_user
 from app.services.quest_service import get_quests_for_today, create_quest, complete_quest
 from app.redis_client import get_redis
+import redis.asyncio as aioredis
 
 router = APIRouter()
 
@@ -21,6 +22,7 @@ QUESTS_TODAY_TTL = 60
 async def get_today_quests(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     quests = await get_quests_for_today(user.id, db)
     generating = False
@@ -28,7 +30,6 @@ async def get_today_quests(
 
     if not quests:
         generating = True
-        redis = get_redis()
         rate_key = f"quest_gen:{user.id}:{date.today()}"
         count = await redis.get(rate_key)
         if not count or int(count) < 3:
@@ -54,8 +55,8 @@ async def get_today_quests(
 async def force_generate(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
-    redis = get_redis()
     rate_key = f"quest_gen:{user.id}:{date.today()}"
     count = await redis.get(rate_key)
     if count and int(count) >= 3:

@@ -2,11 +2,10 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
 from app.main import app
 from app.database import Base, get_db
 from app.redis_client import get_redis
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
@@ -47,14 +46,29 @@ async def db_session(setup_db):
         yield session
 
 
-def mock_redis():
-    redis = AsyncMock()
-    redis.get = AsyncMock(return_value=None)
-    redis.setex = AsyncMock(return_value=True)
-    redis.delete = AsyncMock(return_value=True)
-    redis.incr = AsyncMock(return_value=1)
-    redis.expire = AsyncMock(return_value=True)
-    return redis
+class FakeRedis:
+    def __init__(self):
+        self._store: dict = {}
+
+    async def get(self, key: str):
+        return self._store.get(key)
+
+    async def setex(self, key: str, ttl: int, value):
+        self._store[key] = value
+        return True
+
+    async def delete(self, *keys):
+        for key in keys:
+            self._store.pop(key, None)
+        return len(keys)
+
+    async def incr(self, key: str):
+        current = int(self._store.get(key, 0))
+        self._store[key] = str(current + 1)
+        return current + 1
+
+    async def expire(self, key: str, ttl: int):
+        return True
 
 
 @pytest_asyncio.fixture
@@ -68,8 +82,10 @@ async def client(setup_db):
                 await session.rollback()
                 raise
 
+    fake_redis_instance = FakeRedis()
+
     def override_get_redis():
-        return mock_redis()
+        return fake_redis_instance
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_redis] = override_get_redis

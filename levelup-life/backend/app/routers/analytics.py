@@ -9,16 +9,29 @@ from app.services.analytics_service import (
     get_weekly_report,
     get_patterns,
 )
+from app.redis_client import get_redis
+import redis.asyncio as aioredis
+import json
 
 router = APIRouter()
+
+ANALYTICS_SUMMARY_TTL = 3600
 
 
 @router.get("/summary")
 async def summary(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
-    return await get_summary(user.id, db)
+    cache_key = f"analytics:summary:{user.id}"
+    cached = await redis.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    data = await get_summary(user.id, db)
+    await redis.setex(cache_key, ANALYTICS_SUMMARY_TTL, json.dumps(data))
+    return data
 
 
 @router.get("/weekly-report")
